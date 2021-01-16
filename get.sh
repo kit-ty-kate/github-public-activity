@@ -18,7 +18,15 @@ trap atexit EXIT
 while true; do
   curl -sLH "Accept: application/vnd.github.v3+json" "https://api.github.com/users/$username/events?page=$page" > "$data"
 
-  length=$(cat "$data" | jq 'length')
+  json_type=$(cat "$data" | jq -r 'type')
+  if test "$json_type" != array; then
+    if test "$page" = 1; then
+      echo "Error: Something went wrong." 1>&2
+    fi
+    exit 0
+  fi
+
+  length=$(cat "$data" | jq -r 'length')
   for i in $(seq 0 $((length-1))); do
     event_type=$(cat "$data" | jq -r ".[$i].type")
     created_at=$(date --date=$(cat "$data" | jq -r ".[$i].created_at"))
@@ -130,12 +138,4 @@ while true; do
   done
 
   page=$((page+1))
-  echo 1>&2
-  echo -n "== Continue to page n°$page? [Y/n] " 1>&2
-  read answer
-  echo 1>&2
-  echo 1>&2
-  if test "$answer" = "n"; then
-    exit 0
-  fi
 done
