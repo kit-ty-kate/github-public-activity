@@ -121,7 +121,7 @@ while true; do
       echo "* [$created_at] Forked $repo";;
     "PullRequestReviewEvent")
       # ignored for now. Does not seem very useful
-      ;;
+      continue;;
     *)
       echo "Unknown event type '$event_type'."
       exit 1;;
