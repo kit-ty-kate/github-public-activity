@@ -43,16 +43,85 @@ while true; do
       number_of_commits=$(cat "$data" | jq -r ".[$i].payload.commits | length")
       echo "* [$created_at] Pushed to '$branch' at '$repo':"
       for j in $(seq 0 $((number_of_commits-1))); do
-        commit=$(cat "$data" | jq -r ".[$i].payload.commits | .[$j].message")
+        commit=$(cat "$data" | jq -r ".[$i].payload.commits | .[$j].message" | head -n 1 | cut -c 1-80)
+        test "${#commit}" -ge 80 && commit=$commit…
         echo "  + $commit"
       done;;
     "IssueCommentEvent")
       url=$(cat "$data" | jq -r ".[$i].payload.issue.html_url")
       title=$(cat "$data" | jq -r ".[$i].payload.issue.title")
       body=$(cat "$data" | jq -r ".[$i].payload.comment.body" | head -n 1 | cut -c 1-80)
+      test "${#body}" -ge 80 && body=$body…
       echo "* [$created_at] Commented on $url"
       echo "  + Title: $title"
       echo "  + Comment: $body";;
+    "IssuesEvent")
+      action=$(cat "$data" | jq -r ".[$i].payload.action")
+      case "$action" in
+      "opened")
+        url=$(cat "$data" | jq -r ".[$i].payload.issue.html_url")
+        title=$(cat "$data" | jq -r ".[$i].payload.issue.title")
+        echo "* [$created_at] Opened issue $url"
+        echo "  + $title";;
+      "closed")
+        url=$(cat "$data" | jq -r ".[$i].payload.issue.html_url")
+        title=$(cat "$data" | jq -r ".[$i].payload.issue.title")
+        echo "* [$created_at] Closed issue $url"
+        echo "  + $title";;
+      *)
+        echo "Unknown IssuesEvent type '$action'."
+        exit 1;;
+      esac;;
+    "PullRequestEvent")
+      action=$(cat "$data" | jq -r ".[$i].payload.action")
+      case "$action" in
+      "closed")
+        is_merged=$(cat "$data" | jq -r ".[$i].payload.pull_request.merged")
+        url=$(cat "$data" | jq -r ".[$i].payload.pull_request.html_url")
+        title=$(cat "$data" | jq -r ".[$i].payload.pull_request.title")
+        if test "$is_merged" = "true"; then
+          echo "* [$created_at] Merged pull request $url"
+        else
+          echo "* [$created_at] Closed pull request $url"
+        fi
+        echo "  + $title";;
+      "opened")
+        url=$(cat "$data" | jq -r ".[$i].payload.pull_request.html_url")
+        title=$(cat "$data" | jq -r ".[$i].payload.pull_request.title")
+        echo "* [$created_at] Opened pull request $url"
+        echo "  + $title";;
+      *)
+        echo "Unknown PullRequestEvent type '$action'."
+        exit 1;;
+      esac;;
+    "DeleteEvent")
+      ref_type=$(cat "$data" | jq -r ".[$i].payload.ref_type")
+      case "$ref_type" in
+      "branch")
+        branch=$(cat "$data" | jq -r ".[$i].payload.ref")
+        repo=$(cat "$data" | jq -r ".[$i].repo.name")
+        echo "* [$created_at] Deleted branch '$branch' at '$repo'";;
+      "repository")
+        repo=$(cat "$data" | jq -r ".[$i].repo.name")
+        echo "* [$created_at] Deleted repository: $repo";;
+      *)
+        echo "Unknown DeleteEvent type '$ref_type'."
+        exit 1;;
+      esac;;
+    "PullRequestReviewCommentEvent")
+      url=$(cat "$data" | jq -r ".[$i].payload.pull_request.html_url")
+      title=$(cat "$data" | jq -r ".[$i].payload.pull_request.title")
+      body=$(cat "$data" | jq -r ".[$i].payload.comment.body" | head -n 1 | cut -c 1-80)
+      test "${#body}" -ge 80 && body=$body…
+      echo "* [$created_at] Commented on $url"
+      echo "  + Title: $title"
+      echo "  + Comment: $body";;
+    "ForkEvent")
+      repo=$(cat "$data" | jq -r ".[$i].repo.name")
+      echo "* [$created_at] Forked $repo";;
+    "PullRequestReviewEvent")
+      # ignored for now. Does not seem very useful
+      ;;
     *)
       echo "Unknown event type '$event_type'."
       exit 1;;
@@ -64,7 +133,9 @@ while true; do
   echo
   echo -n "== Continue to page n°$page? [Y/n] "
   read answer
-  if test $answer = "n"; then
+  echo
+  echo
+  if test "$answer" = "n"; then
     exit 0
   fi
 done
