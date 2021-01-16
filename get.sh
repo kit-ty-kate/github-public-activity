@@ -130,11 +130,11 @@ while true; do
   done
 
   page=$((page+1))
-  echo
-  echo -n "== Continue to page n°$page? [Y/n] "
+  echo 1>&2
+  echo -n "== Continue to page n°$page? [Y/n] " 1>&2
   read answer
-  echo
-  echo
+  echo 1>&2
+  echo 1>&2
   if test "$answer" = "n"; then
     exit 0
   fi
